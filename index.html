@@ -137,6 +137,25 @@
   .login-error{color:var(--danger);font-size:12.5px;min-height:18px;margin-bottom:6px;}
   .login-note{font-size:11px;color:var(--ink-soft);text-align:center;margin-top:14px;margin-bottom:0;}
 
+  /* ---- type toggle / notice badges ---- */
+  .type-toggle{display:flex;gap:8px;}
+  .type-btn{
+    flex:1;padding:8px 0;border:1px solid var(--line);border-radius:6px;background:#fff;
+    color:var(--ink-soft);font-size:13px;cursor:pointer;font-family:inherit;
+  }
+  .type-btn.active{background:var(--navy);border-color:var(--navy);color:#fff;}
+  .notice-tag{
+    display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;
+    background:#e3ecea;color:var(--navy);margin-right:6px;
+  }
+  .handover-tag{
+    display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;
+    background:var(--amber-soft);color:#8a5a26;margin-right:6px;
+  }
+  .seen-line{font-size:12px;color:var(--ink-soft);margin-top:8px;line-height:1.6;}
+  .seen-line b{color:var(--navy);}
+  .seen-all{color:#3f7a5a;font-weight:600;}
+
   /* ---- daily list ---- */
   .daily-row{
     display:flex;gap:14px;align-items:flex-start;
@@ -232,7 +251,7 @@
     <p class="login-sub">弘文社 業務共有ツール</p>
     <div class="field">
       <label>メールアドレス</label>
-      <input type="email" id="loginEmail" placeholder="例：senba@koubunsha-yotei.local">
+      <input type="email" id="loginEmail" placeholder="例：senba@koubunsha.com">
     </div>
     <div class="field">
       <label>パスワード</label>
@@ -244,6 +263,31 @@
   </div>
 </div>
 
+<div class="overlay" id="operatorOverlay">
+  <div class="modal">
+    <h3>操作者を選択してください</h3>
+    <p style="font-size:13px;color:var(--ink-soft);margin-top:-6px;">今この端末を使っているのはどなたですか？予定・引き継ぎの確認状況の記録に使います。</p>
+    <div class="field">
+      <label>操作者</label>
+      <select id="operatorSelectInit"></select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="operatorSelectConfirm">決定</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="reminderOverlay">
+  <div class="modal">
+    <h3>未確認の連絡・引き継ぎがあります</h3>
+    <p style="font-size:13px;color:var(--ink-soft);margin-top:-6px;">登録から3日以上経っても確認されていない項目です。内容をご確認ください。</p>
+    <div id="reminderList" style="max-height:260px;overflow-y:auto;"></div>
+    <div class="modal-actions">
+      <button class="btn" id="reminderCloseBtn">閉じる</button>
+    </div>
+  </div>
+</div>
+
 <div class="shell" id="appShell" style="display:none;">
   <div class="sidebar">
     <div class="brand">
@@ -252,7 +296,7 @@
     </div>
     <div class="nav-item active" data-view="calendar"><span class="nav-icon">◆</span>予定表</div>
     <div class="nav-item" data-view="daily"><span class="nav-icon">◆</span>日別一覧</div>
-    <div class="nav-item" data-view="handover"><span class="nav-icon">◆</span>引き継ぎ</div>
+    <div class="nav-item" data-view="handover"><span class="nav-icon">◆</span>引き継ぎ・連絡事項</div>
     <div class="nav-item" data-view="members"><span class="nav-icon">◆</span>メンバー</div>
     <div class="nav-item" data-view="operator"><span class="nav-icon">◆</span>操作者</div>
   </div>
@@ -305,17 +349,16 @@
     <div class="view" id="view-handover">
       <div class="view-head">
         <div>
-          <h2>引き継ぎ</h2>
-          <div class="view-sub">業務メモと、担当交代時の予定・タスクの引き渡しをまとめて管理します</div>
+          <h2>引き継ぎ・連絡事項</h2>
+          <div class="view-sub">業務の引き継ぎと、全員向けの連絡事項をまとめて管理します</div>
         </div>
-        <button class="btn" id="btnNewHandover">＋ 引き継ぎを作成</button>
+        <button class="btn" id="btnNewHandover">＋ 新規作成</button>
       </div>
 
       <div class="filter-row" style="margin-bottom:14px;">
         表示
         <select class="filter-select" id="handoverStatusFilter">
-          <option value="pending">未完了</option>
-          <option value="done">完了済み（履歴）</option>
+          <option value="active">未完了・未確認</option>
           <option value="all">すべて</option>
         </select>
       </div>
@@ -395,15 +438,22 @@
   </div>
 </div>
 
-<!-- 引き継ぎモーダル -->
+<!-- 引き継ぎ・連絡事項モーダル -->
 <div class="overlay" id="handoverOverlay">
   <div class="modal">
-    <h3 id="hoModalTitle">引き継ぎを作成</h3>
+    <h3 id="hoModalTitle">引き継ぎ・連絡事項を作成</h3>
     <div class="field">
-      <label>業務名</label>
+      <label>種別</label>
+      <div class="type-toggle">
+        <button type="button" class="type-btn active" data-type="handover" id="hoTypeHandover">引き継ぎ</button>
+        <button type="button" class="type-btn" data-type="notice" id="hoTypeNotice">連絡事項</button>
+      </div>
+    </div>
+    <div class="field">
+      <label id="hoTitleLabel">業務名</label>
       <input type="text" id="hoTitle" placeholder="例：在庫棚卸し業務">
     </div>
-    <div class="field" style="display:flex;gap:10px;">
+    <div class="field" id="hoFromToRow" style="display:flex;gap:10px;">
       <div style="flex:1;">
         <label>引き継ぎ元</label>
         <select id="hoFrom"></select>
@@ -414,10 +464,10 @@
       </div>
     </div>
     <div class="field">
-      <label>メモ・注意事項</label>
+      <label id="hoNoteLabel">メモ・注意事項</label>
       <textarea id="hoNote" placeholder="引き継ぎ内容、注意点、進捗状況など"></textarea>
     </div>
-    <div class="field">
+    <div class="field" id="hoRelatedRow">
       <label>関連する予定（引き継ぎ元の今後の予定から選択）</label>
       <div class="related-list" id="hoRelated"></div>
     </div>
@@ -499,6 +549,7 @@ if (firebaseReady){
     if (e.key === 'Enter') document.getElementById('loginBtn').click();
   });
   document.getElementById('logoutBtn').addEventListener('click', () => {
+    localStorage.removeItem('kh_current_user');
     auth.signOut();
   });
 } else {
@@ -599,6 +650,7 @@ async function updateSchedule(id, entry){
 async function addHandover(entry){
   entry.createdAt = Date.now();
   entry.status = 'pending';
+  entry.viewedBy = entry.type === 'notice' ? [state.currentUser] : [];
   if (firebaseReady){
     await db.collection('handovers').add(entry);
   } else {
@@ -636,6 +688,21 @@ async function removeHandover(id){
     saveLocal(local);
   }
 }
+async function markViewed(id, person){
+  if (firebaseReady){
+    await db.collection('handovers').doc(id).update({
+      viewedBy: firebase.firestore.FieldValue.arrayUnion(person)
+    });
+  } else {
+    const local = loadLocal();
+    const h = local.handovers.find(x => x.id === id);
+    if (h){
+      h.viewedBy = h.viewedBy || [];
+      if (!h.viewedBy.includes(person)) h.viewedBy.push(person);
+      saveLocal(local);
+    }
+  }
+}
 
 /* ---------- UI: navigation ---------- */
 document.querySelectorAll('.nav-item').forEach(item => {
@@ -644,6 +711,8 @@ document.querySelectorAll('.nav-item').forEach(item => {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     item.classList.add('active');
     document.getElementById('view-' + item.dataset.view).classList.add('active');
+    if (item.dataset.view === 'handover') renderHandoverList();
+    if (item.dataset.view === 'daily') renderDailyView();
   });
 });
 
@@ -674,7 +743,10 @@ function renderMemberSelects(){
   personFilter.innerHTML = '<option value="">全員</option>' + names.map(n => `<option value="${n}">${n}</option>`).join('');
   personFilter.value = prevF;
 
-  if (!state.currentUser && names.length) state.currentUser = names[0];
+  if (!state.currentUser && names.length){
+    const saved = localStorage.getItem('kh_current_user');
+    state.currentUser = (saved && names.includes(saved)) ? saved : names[0];
+  }
   document.getElementById('currentUser').value = state.currentUser;
 }
 
@@ -708,6 +780,7 @@ document.getElementById('btnAddMember').addEventListener('click', async () => {
 
 document.getElementById('currentUser').addEventListener('change', (e) => {
   state.currentUser = e.target.value;
+  localStorage.setItem('kh_current_user', e.target.value);
 });
 
 /* ---------- calendar ---------- */
@@ -868,55 +941,114 @@ document.getElementById('schedDelete').addEventListener('click', async () => {
   showToast('予定を削除しました');
 });
 
-/* ---------- handover ---------- */
+/* ---------- handover / notice ---------- */
 function renderHandoverList(){
   const filter = document.getElementById('handoverStatusFilter').value;
+  const memberNames = state.members.map(m => m.name);
+
   let list = state.handovers.slice();
-  if (filter !== 'all') list = list.filter(h => h.status === filter);
+  if (filter === 'active'){
+    list = list.filter(h => {
+      const viewedBy = h.viewedBy || [];
+      const allSeen = memberNames.length > 0 && memberNames.every(n => viewedBy.includes(n));
+      if (h.type === 'notice') return !allSeen;
+      return h.status !== 'done';
+    });
+  }
   const wrap = document.getElementById('handoverList');
 
   if (!list.length){
-    wrap.innerHTML = '<div class="empty-state">該当する引き継ぎはありません</div>';
-    return;
+    wrap.innerHTML = '<div class="empty-state">該当する項目はありません</div>';
+  } else {
+    wrap.innerHTML = list.map(h => {
+      const viewedBy = (h.viewedBy || []).filter(n => memberNames.includes(n));
+      const notSeen = memberNames.filter(n => !viewedBy.includes(n));
+      const allSeen = memberNames.length > 0 && notSeen.length === 0;
+      const isNotice = h.type === 'notice';
+
+      const seenLine = memberNames.length ? `
+        <div class="seen-line ${allSeen ? 'seen-all' : ''}">
+          既読 <b>${viewedBy.length}/${memberNames.length}</b>
+          ${allSeen ? '（全員確認済み）' : (notSeen.length ? `／ 未確認：${notSeen.map(escapeHtml).join('・')}` : '')}
+        </div>` : '';
+
+      if (isNotice){
+        return `
+        <div class="card">
+          <div class="card-top">
+            <div>
+              <span class="notice-tag">連絡事項</span>
+              <div class="card-title" style="display:inline;">${escapeHtml(h.title)}</div>
+              <div class="card-meta">発信：${escapeHtml(h.createdBy || '')}　${formatDate(h.createdAt)}</div>
+            </div>
+          </div>
+          ${h.note ? `<div class="card-note">${escapeHtml(h.note)}</div>` : ''}
+          ${seenLine}
+          <div class="card-actions">
+            <button class="btn small secondary" data-act="edit" data-id="${h.id}">編集</button>
+            <button class="btn small danger" data-act="del" data-id="${h.id}">削除</button>
+          </div>
+        </div>`;
+      }
+
+      const related = (h.relatedSchedules || []);
+      return `
+      <div class="card">
+        <div class="card-top">
+          <div>
+            <span class="handover-tag">引き継ぎ</span>
+            <div class="card-title" style="display:inline;">${escapeHtml(h.title)}</div>
+            <div class="card-meta">${escapeHtml(h.fromPerson)} <span class="arrow">→</span> ${escapeHtml(h.toPerson)}</div>
+          </div>
+          <span class="tag ${h.status === 'done' ? 'status-done' : 'status-pending'}">${h.status === 'done' ? '完了' : '未完了'}</span>
+        </div>
+        ${h.note ? `<div class="card-note">${escapeHtml(h.note)}</div>` : ''}
+        ${related.length ? `<div class="card-meta" style="margin-top:10px;">引き継ぐ予定：${related.map(r => `${r.date} ${escapeHtml(r.title)}`).join(' ／ ')}</div>` : ''}
+        ${seenLine}
+        <div class="card-actions">
+          <button class="btn small secondary" data-act="edit" data-id="${h.id}">編集</button>
+          ${h.status !== 'done' ? `<button class="btn small" data-act="done" data-id="${h.id}">完了にする</button>` : `<button class="btn small secondary" data-act="reopen" data-id="${h.id}">未完了に戻す</button>`}
+          <button class="btn small danger" data-act="del" data-id="${h.id}">削除</button>
+        </div>
+      </div>`;
+    }).join('');
+
+    wrap.querySelectorAll('[data-act="edit"]').forEach(b => b.addEventListener('click', () => {
+      const h = state.handovers.find(x => x.id === b.dataset.id);
+      if (h) openHandoverModal(h);
+    }));
+    wrap.querySelectorAll('[data-act="done"]').forEach(b => b.addEventListener('click', async () => {
+      await setHandoverStatus(b.dataset.id, 'done'); await refresh(); showToast('完了にしました');
+    }));
+    wrap.querySelectorAll('[data-act="reopen"]').forEach(b => b.addEventListener('click', async () => {
+      await setHandoverStatus(b.dataset.id, 'pending'); await refresh(); showToast('未完了に戻しました');
+    }));
+    wrap.querySelectorAll('[data-act="del"]').forEach(b => b.addEventListener('click', async () => {
+      if (!confirm('この項目を削除しますか？')) return;
+      await removeHandover(b.dataset.id); await refresh(); showToast('削除しました');
+    }));
   }
 
-  wrap.innerHTML = list.map(h => {
-    const related = (h.relatedSchedules || []);
-    return `
-    <div class="card">
-      <div class="card-top">
-        <div>
-          <div class="card-title">${h.title}</div>
-          <div class="card-meta">${h.fromPerson} <span class="arrow">→</span> ${h.toPerson}</div>
-        </div>
-        <span class="tag ${h.status === 'done' ? 'status-done' : 'status-pending'}">${h.status === 'done' ? '完了' : '未完了'}</span>
-      </div>
-      ${h.note ? `<div class="card-note">${escapeHtml(h.note)}</div>` : ''}
-      ${related.length ? `<div class="card-meta" style="margin-top:10px;">引き継ぐ予定：${related.map(r => `${r.date} ${r.title}`).join(' ／ ')}</div>` : ''}
-      <div class="card-actions">
-        <button class="btn small secondary" data-act="edit" data-id="${h.id}">編集</button>
-        ${h.status !== 'done' ? `<button class="btn small" data-act="done" data-id="${h.id}">完了にする</button>` : `<button class="btn small secondary" data-act="reopen" data-id="${h.id}">未完了に戻す</button>`}
-        <button class="btn small danger" data-act="del" data-id="${h.id}">削除</button>
-      </div>
-    </div>`;
-  }).join('');
-
-  wrap.querySelectorAll('[data-act="edit"]').forEach(b => b.addEventListener('click', () => {
-    const h = state.handovers.find(x => x.id === b.dataset.id);
-    if (h) openHandoverModal(h);
-  }));
-  wrap.querySelectorAll('[data-act="done"]').forEach(b => b.addEventListener('click', async () => {
-    await setHandoverStatus(b.dataset.id, 'done'); await refresh(); showToast('完了にしました');
-  }));
-  wrap.querySelectorAll('[data-act="reopen"]').forEach(b => b.addEventListener('click', async () => {
-    await setHandoverStatus(b.dataset.id, 'pending'); await refresh(); showToast('未完了に戻しました');
-  }));
-  wrap.querySelectorAll('[data-act="del"]').forEach(b => b.addEventListener('click', async () => {
-    if (!confirm('この引き継ぎを削除しますか？')) return;
-    await removeHandover(b.dataset.id); await refresh(); showToast('削除しました');
-  }));
+  // ③ 表示中に操作者を既読としてマーク
+  if (document.getElementById('view-handover').classList.contains('active') && state.currentUser){
+    const toMark = list.filter(h => !(h.viewedBy || []).includes(state.currentUser));
+    if (toMark.length){
+      toMark.forEach(h => {
+        h.viewedBy = h.viewedBy || [];
+        h.viewedBy.push(state.currentUser);
+      });
+      Promise.all(toMark.map(h => markViewed(h.id, state.currentUser)));
+      renderHandoverList();
+    }
+  }
 }
 document.getElementById('handoverStatusFilter').addEventListener('change', renderHandoverList);
+
+function formatDate(ts){
+  if (!ts) return '';
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
 
 function escapeHtml(str){
   return str.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -943,16 +1075,34 @@ function renderRelatedCandidates(checkedTitles){
 }
 
 let editingHandoverId = null;
+let hoCurrentType = 'handover';
+
+function setHoType(type){
+  hoCurrentType = type;
+  document.getElementById('hoTypeHandover').classList.toggle('active', type === 'handover');
+  document.getElementById('hoTypeNotice').classList.toggle('active', type === 'notice');
+  const isNotice = type === 'notice';
+  document.getElementById('hoFromToRow').style.display = isNotice ? 'none' : 'flex';
+  document.getElementById('hoRelatedRow').style.display = isNotice ? 'none' : '';
+  document.getElementById('hoTitleLabel').textContent = isNotice ? '件名' : '業務名';
+  document.getElementById('hoNoteLabel').textContent = isNotice ? '連絡内容' : 'メモ・注意事項';
+  document.getElementById('hoTitle').placeholder = isNotice ? '例：夏季休業のお知らせ' : '例：在庫棚卸し業務';
+}
+document.getElementById('hoTypeHandover').addEventListener('click', () => setHoType('handover'));
+document.getElementById('hoTypeNotice').addEventListener('click', () => setHoType('notice'));
+
 function openHandoverModal(entry){
   editingHandoverId = entry ? entry.id : null;
-  document.getElementById('hoModalTitle').textContent = entry ? '引き継ぎを編集' : '引き継ぎを作成';
+  const type = entry ? (entry.type || 'handover') : 'handover';
+  setHoType(type);
+  document.getElementById('hoModalTitle').textContent = entry ? '編集' : '引き継ぎ・連絡事項を作成';
   document.getElementById('hoDelete').style.display = entry ? '' : 'none';
   document.getElementById('hoSave').textContent = entry ? '保存' : '作成';
   document.getElementById('hoTitle').value = entry ? entry.title : '';
   document.getElementById('hoNote').value = entry ? (entry.note || '') : '';
   document.getElementById('hoFrom').value = entry ? entry.fromPerson : state.currentUser;
   renderRelatedCandidates(entry ? entry.relatedSchedules : null);
-  if (entry) document.getElementById('hoTo').value = entry.toPerson;
+  if (entry && entry.toPerson) document.getElementById('hoTo').value = entry.toPerson;
   document.getElementById('handoverOverlay').classList.add('active');
 }
 document.getElementById('btnNewHandover').addEventListener('click', () => openHandoverModal());
@@ -962,30 +1112,39 @@ document.getElementById('hoCancel').addEventListener('click', () => {
 });
 document.getElementById('hoSave').addEventListener('click', async () => {
   const title = document.getElementById('hoTitle').value.trim();
-  const fromPerson = document.getElementById('hoFrom').value;
-  const toPerson = document.getElementById('hoTo').value;
   const note = document.getElementById('hoNote').value.trim();
-  if (!title || !fromPerson || !toPerson){ showToast('業務名・引き継ぎ元・引き継ぎ先は必須です'); return; }
-  const relatedSchedules = Array.from(document.querySelectorAll('#hoRelated input:checked')).map(cb => ({
-    date: cb.dataset.date, title: cb.dataset.title
-  }));
-  if (editingHandoverId){
-    await updateHandover(editingHandoverId, {title, fromPerson, toPerson, note, relatedSchedules});
-    showToast('引き継ぎを更新しました');
+  if (!title){ showToast('件名・業務名は必須です'); return; }
+
+  let payload = { type: hoCurrentType, title, note };
+  if (hoCurrentType === 'handover'){
+    const fromPerson = document.getElementById('hoFrom').value;
+    const toPerson = document.getElementById('hoTo').value;
+    if (!fromPerson || !toPerson){ showToast('引き継ぎ元・引き継ぎ先は必須です'); return; }
+    const relatedSchedules = Array.from(document.querySelectorAll('#hoRelated input:checked')).map(cb => ({
+      date: cb.dataset.date, title: cb.dataset.title
+    }));
+    payload = { ...payload, fromPerson, toPerson, relatedSchedules };
   } else {
-    await addHandover({title, fromPerson, toPerson, note, relatedSchedules});
-    showToast('引き継ぎを作成しました');
+    payload.createdBy = (editingHandoverId && state.handovers.find(h => h.id === editingHandoverId)?.createdBy) || state.currentUser;
+  }
+
+  if (editingHandoverId){
+    await updateHandover(editingHandoverId, payload);
+    showToast('更新しました');
+  } else {
+    await addHandover(payload);
+    showToast('作成しました');
   }
   document.getElementById('handoverOverlay').classList.remove('active');
   await refresh();
 });
 document.getElementById('hoDelete').addEventListener('click', async () => {
   if (!editingHandoverId) return;
-  if (!confirm('この引き継ぎを削除しますか？')) return;
+  if (!confirm('この項目を削除しますか？')) return;
   await removeHandover(editingHandoverId);
   document.getElementById('handoverOverlay').classList.remove('active');
   await refresh();
-  showToast('引き継ぎを削除しました');
+  showToast('削除しました');
 });
 
 /* ---------- refresh / init ---------- */
@@ -997,8 +1156,59 @@ async function refresh(){
   renderDailyView();
   renderHandoverList();
 }
-function boot(){
-  refresh();
+
+/* ① ログイン後に操作者を選択させる */
+function maybeShowOperatorOverlay(){
+  const names = state.members.map(m => m.name);
+  const saved = localStorage.getItem('kh_current_user');
+  if (!saved && names.length){
+    const sel = document.getElementById('operatorSelectInit');
+    sel.innerHTML = names.map(n => `<option value="${n}">${escapeHtml(n)}</option>`).join('');
+    document.getElementById('operatorOverlay').classList.add('active');
+  } else {
+    checkReminders();
+  }
+}
+document.getElementById('operatorSelectConfirm').addEventListener('click', () => {
+  const val = document.getElementById('operatorSelectInit').value;
+  if (!val) return;
+  state.currentUser = val;
+  localStorage.setItem('kh_current_user', val);
+  document.getElementById('currentUser').value = val;
+  document.getElementById('operatorOverlay').classList.remove('active');
+  renderHandoverList();
+  checkReminders();
+});
+
+/* ④ 3日以上未確認の項目があれば操作者にポップアップ通知 */
+function checkReminders(){
+  if (!state.currentUser) return;
+  const THREE_DAYS = 3 * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  const overdue = state.handovers.filter(h => {
+    if (!h.createdAt || (now - h.createdAt) < THREE_DAYS) return false;
+    const viewedBy = h.viewedBy || [];
+    if (viewedBy.includes(state.currentUser)) return false;
+    if (h.type === 'notice') return true;
+    return h.toPerson === state.currentUser;
+  });
+  if (!overdue.length) return;
+  document.getElementById('reminderList').innerHTML = overdue.map(h => `
+    <div class="card" style="margin-bottom:8px;">
+      <span class="${h.type === 'notice' ? 'notice-tag' : 'handover-tag'}">${h.type === 'notice' ? '連絡事項' : '引き継ぎ'}</span>
+      <div class="card-title" style="display:inline;">${escapeHtml(h.title)}</div>
+      <div class="card-meta">登録日：${formatDate(h.createdAt)}</div>
+    </div>
+  `).join('');
+  document.getElementById('reminderOverlay').classList.add('active');
+}
+document.getElementById('reminderCloseBtn').addEventListener('click', () => {
+  document.getElementById('reminderOverlay').classList.remove('active');
+});
+
+async function boot(){
+  await refresh();
+  maybeShowOperatorOverlay();
 }
 </script>
 </body>
