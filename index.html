@@ -123,6 +123,20 @@
   .cal-entry.mine{background:var(--amber-soft);color:#8a5a26;border-left-color:var(--amber);}
   .cal-more{font-size:10px;color:var(--ink-soft);}
 
+  /* ---- login screen ---- */
+  .login-screen{
+    position:fixed;inset:0;background:var(--navy);
+    display:flex;align-items:center;justify-content:center;z-index:200;
+  }
+  .login-box{
+    background:#fff;border-radius:var(--radius-doc);padding:32px 28px;
+    width:90%;max-width:340px;
+  }
+  .login-box h1{font-size:18px;margin:0 0 2px;color:var(--navy);}
+  .login-sub{font-size:12px;color:var(--ink-soft);margin:0 0 20px;}
+  .login-error{color:var(--danger);font-size:12.5px;min-height:18px;margin-bottom:6px;}
+  .login-note{font-size:11px;color:var(--ink-soft);text-align:center;margin-top:14px;margin-bottom:0;}
+
   /* ---- daily list ---- */
   .daily-row{
     display:flex;gap:14px;align-items:flex-start;
@@ -212,7 +226,25 @@
 </head>
 <body>
 
-<div class="shell">
+<div class="login-screen" id="loginScreen">
+  <div class="login-box">
+    <h1>予定・引き継ぎ管理</h1>
+    <p class="login-sub">弘文社 業務共有ツール</p>
+    <div class="field">
+      <label>メールアドレス</label>
+      <input type="email" id="loginEmail" placeholder="例：senba@koubunsha-yotei.local">
+    </div>
+    <div class="field">
+      <label>パスワード</label>
+      <input type="password" id="loginPassword">
+    </div>
+    <div class="login-error" id="loginError"></div>
+    <button class="btn" id="loginBtn" style="width:100%;">ログイン</button>
+    <p class="login-note">ログイン状態はブラウザを閉じるまで保持されます。</p>
+  </div>
+</div>
+
+<div class="shell" id="appShell" style="display:none;">
   <div class="sidebar">
     <div class="brand">
       <h1>予定・引き継ぎ<br>管理</h1>
@@ -324,6 +356,11 @@
           <label>操作者（自分）</label>
           <select id="currentUser"></select>
         </div>
+        <div class="field" id="loginAsRow" style="margin-top:4px;">
+          <label>ログイン中のアカウント</label>
+          <div id="loggedInEmail" style="font-size:13px;color:var(--ink-soft);margin-bottom:10px;"></div>
+          <button class="btn secondary small" id="logoutBtn">ログアウト</button>
+        </div>
       </div>
     </div>
 
@@ -397,6 +434,7 @@
 <!-- Firebase (compat SDK: CDN経由、ビルド不要でGitHub Pagesにそのまま置ける) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script>
 /* =========================================================
    Firebase 設定
@@ -414,16 +452,61 @@ const firebaseConfig = {
 };
 
 let db = null;
+let auth = null;
 let firebaseReady = false;
 try {
   if (firebaseConfig.apiKey !== "YOUR_API_KEY") {
     firebase.initializeApp(firebaseConfig);
     db = firebase.firestore();
+    auth = firebase.auth();
     firebaseReady = true;
     document.getElementById('setupNote').style.display = 'none';
   }
 } catch (e) {
   console.error("Firebase init failed", e);
+}
+
+/* =========================================================
+   ログイン（ブラウザを閉じるまでセッション維持）
+   ========================================================= */
+if (firebaseReady){
+  auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(e => console.error(e));
+
+  auth.onAuthStateChanged(user => {
+    if (user){
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('appShell').style.display = '';
+      document.getElementById('loggedInEmail').textContent = user.email || '';
+      boot();
+    } else {
+      document.getElementById('loginScreen').style.display = 'flex';
+      document.getElementById('appShell').style.display = 'none';
+    }
+  });
+
+  document.getElementById('loginBtn').addEventListener('click', () => {
+    const email = document.getElementById('loginEmail').value.trim();
+    const pass = document.getElementById('loginPassword').value;
+    const errEl = document.getElementById('loginError');
+    errEl.textContent = '';
+    if (!email || !pass){ errEl.textContent = 'メールアドレスとパスワードを入力してください'; return; }
+    auth.signInWithEmailAndPassword(email, pass).catch(e => {
+      errEl.textContent = 'ログインに失敗しました（メールアドレスまたはパスワードが違います）';
+      console.error(e);
+    });
+  });
+  document.getElementById('loginPassword').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('loginBtn').click();
+  });
+  document.getElementById('logoutBtn').addEventListener('click', () => {
+    auth.signOut();
+  });
+} else {
+  // Firebase未設定時はログイン画面をスキップしてローカル動作
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('appShell').style.display = '';
+  document.getElementById('loginAsRow').style.display = 'none';
+  boot();
 }
 
 /* =========================================================
@@ -914,8 +997,9 @@ async function refresh(){
   renderDailyView();
   renderHandoverList();
 }
-
-refresh();
+function boot(){
+  refresh();
+}
 </script>
 </body>
 </html>
