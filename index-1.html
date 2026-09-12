@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>予定・引き継ぎ管理</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#232823;
+    --ink-soft:#5b6560;
+    --paper:#faf9f6;
+    --paper-raised:#ffffff;
+    --line:#d9d6cd;
+    --navy:#2b3a44;
+    --navy-soft:#3d5262;
+    --sage:#5c7a63;
+    --sage-soft:#e7ede4;
+    --amber:#b9803f;
+    --amber-soft:#f4e6d3;
+    --danger:#a04b3f;
+    --radius-doc: 2px;
+    --shadow-doc: 0 1px 0 rgba(35,40,35,0.06), 0 1px 3px rgba(35,40,35,0.06);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Noto Sans JP", sans-serif;
+    font-size:15px;
+    line-height:1.7;
+    min-height:100vh;
+  }
+  h1,h2,h3{
+    font-family:"Shippori Mincho", serif;
+    font-weight:700;
+    margin:0;
+    color:var(--navy);
+    letter-spacing:.02em;
+  }
+  button{font-family:inherit;}
+
+  /* ---- shell layout ---- */
+  .shell{display:flex;min-height:100vh;}
+  .sidebar{
+    width:220px;flex:none;
+    background:var(--navy);
+    color:#e8eae6;
+    padding:28px 0;
+    display:flex;flex-direction:column;
+  }
+  .brand{padding:0 24px 24px;border-bottom:1px solid rgba(255,255,255,.12);margin-bottom:12px;}
+  .brand h1{color:#fff;font-size:19px;line-height:1.4;}
+  .brand p{margin:6px 0 0;font-size:12px;color:#b9c2bd;font-family:"Noto Sans JP",sans-serif;}
+  .nav-item{
+    display:flex;align-items:center;gap:10px;
+    padding:13px 24px;cursor:pointer;
+    font-size:14px;color:#cdd4cf;
+    border-left:3px solid transparent;
+    transition:background .15s;
+  }
+  .nav-item:hover{background:rgba(255,255,255,.06);}
+  .nav-item.active{
+    background:rgba(255,255,255,.10);
+    color:#fff;
+    border-left-color:var(--amber);
+  }
+  .nav-icon{width:18px;text-align:center;font-size:15px;}
+  .sidebar-foot{margin-top:auto;padding:18px 24px 0;border-top:1px solid rgba(255,255,255,.12);}
+  .who-label{font-size:11px;color:#9fa9a3;margin-bottom:6px;}
+  select#currentUser{
+    width:100%;background:rgba(255,255,255,.08);color:#fff;
+    border:1px solid rgba(255,255,255,.2);border-radius:var(--radius-doc);
+    padding:7px 8px;font-size:13px;
+  }
+  select#currentUser option{color:#232823;}
+
+  .main{flex:1;padding:32px 40px;max-width:980px;}
+  .view{display:none;}
+  .view.active{display:block;}
+  .view-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:10px;}
+  .view-head h2{font-size:22px;}
+  .view-sub{color:var(--ink-soft);font-size:13px;margin-top:4px;}
+
+  .btn{
+    border:1px solid var(--navy);background:var(--navy);color:#fff;
+    padding:9px 16px;border-radius:var(--radius-doc);cursor:pointer;
+    font-size:13.5px;font-weight:500;letter-spacing:.01em;
+  }
+  .btn:hover{background:var(--navy-soft);}
+  .btn.secondary{background:transparent;color:var(--navy);border-color:var(--line);}
+  .btn.secondary:hover{border-color:var(--navy);}
+  .btn.small{padding:5px 10px;font-size:12px;}
+  .btn.danger{background:transparent;color:var(--danger);border-color:var(--danger);}
+  .btn.danger:hover{background:var(--danger);color:#fff;}
+
+  /* ---- calendar ---- */
+  .cal-toolbar{display:flex;align-items:center;gap:14px;margin-bottom:16px;flex-wrap:wrap;}
+  .cal-toolbar .month-label{font-family:"Shippori Mincho",serif;font-size:18px;font-weight:700;min-width:120px;}
+  .filter-row{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-soft);margin-left:auto;}
+  select.filter-select{
+    border:1px solid var(--line);border-radius:var(--radius-doc);
+    padding:6px 8px;font-size:13px;background:#fff;color:var(--ink);
+  }
+  .cal-grid{
+    display:grid;grid-template-columns:repeat(7,1fr);
+    border:1px solid var(--line);border-radius:var(--radius-doc);overflow:hidden;
+    background:var(--line);gap:1px;
+  }
+  .cal-dow{background:var(--paper-raised);padding:8px 0;text-align:center;font-size:12px;color:var(--ink-soft);font-weight:600;}
+  .cal-cell{
+    background:var(--paper-raised);min-height:104px;padding:6px 7px;
+    display:flex;flex-direction:column;gap:4px;cursor:pointer;
+  }
+  .cal-cell:hover{background:#f3f1ec;}
+  .cal-cell.other-month{background:#f6f5f2;color:#b8b4a9;}
+  .cal-cell.today{box-shadow:inset 0 0 0 2px var(--amber);}
+  .cal-daynum{font-size:12px;font-weight:600;color:var(--ink-soft);}
+  .cal-entry{
+    background:var(--sage-soft);color:var(--sage);border-left:3px solid var(--sage);
+    font-size:11px;padding:2px 5px;border-radius:1px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .cal-entry.mine{background:var(--amber-soft);color:#8a5a26;border-left-color:var(--amber);}
+  .cal-more{font-size:10px;color:var(--ink-soft);}
+
+  /* ---- lists / cards ---- */
+  .card{
+    background:var(--paper-raised);border:1px solid var(--line);border-radius:var(--radius-doc);
+    padding:16px 18px;margin-bottom:12px;box-shadow:var(--shadow-doc);
+  }
+  .card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
+  .card-title{font-weight:600;font-size:15px;color:var(--navy);}
+  .tag{
+    display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;
+    background:var(--sage-soft);color:var(--sage);font-weight:600;
+  }
+  .tag.status-done{background:#e3e6e1;color:#7a8279;}
+  .tag.status-pending{background:var(--amber-soft);color:#8a5a26;}
+  .card-meta{font-size:12.5px;color:var(--ink-soft);margin-top:4px;}
+  .card-note{margin-top:10px;font-size:13.5px;white-space:pre-wrap;line-height:1.7;color:#3a3f3a;}
+  .card-actions{margin-top:12px;display:flex;gap:8px;}
+  .arrow{color:var(--ink-soft);margin:0 6px;}
+  .empty-state{
+    border:1px dashed var(--line);border-radius:var(--radius-doc);
+    padding:36px 20px;text-align:center;color:var(--ink-soft);font-size:13.5px;
+  }
+
+  /* ---- modal ---- */
+  .overlay{
+    display:none;position:fixed;inset:0;background:rgba(35,40,35,.35);
+    align-items:flex-start;justify-content:center;padding:6vh 20px;overflow:auto;z-index:50;
+  }
+  .overlay.active{display:flex;}
+  .modal{
+    background:#fff;border-radius:var(--radius-doc);width:100%;max-width:460px;
+    padding:26px 26px 22px;box-shadow:0 10px 40px rgba(0,0,0,.18);
+  }
+  .modal h3{font-size:17px;margin-bottom:16px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:12.5px;color:var(--ink-soft);margin-bottom:5px;font-weight:600;}
+  .field input, .field select, .field textarea{
+    width:100%;border:1px solid var(--line);border-radius:var(--radius-doc);
+    padding:8px 10px;font-size:13.5px;font-family:inherit;background:#fff;color:var(--ink);
+  }
+  .field textarea{resize:vertical;min-height:70px;}
+  .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;}
+  .related-list{border:1px solid var(--line);border-radius:var(--radius-doc);max-height:140px;overflow:auto;}
+  .related-item{display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:13px;border-bottom:1px solid var(--line);}
+  .related-item:last-child{border-bottom:none;}
+  .related-item span{color:var(--ink-soft);font-size:12px;}
+
+  .toast{
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+    background:var(--navy);color:#fff;padding:10px 20px;border-radius:var(--radius-doc);
+    font-size:13px;opacity:0;pointer-events:none;transition:opacity .25s;z-index:80;
+  }
+  .toast.show{opacity:1;}
+
+  .members-box{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+  .member-chip{
+    background:var(--sage-soft);color:var(--sage);border-radius:12px;
+    padding:5px 12px;font-size:12.5px;display:flex;align-items:center;gap:6px;
+  }
+  .member-chip button{background:none;border:none;color:#8a8f89;cursor:pointer;font-size:12px;padding:0;}
+  .setup-note{font-size:12px;color:var(--ink-soft);background:#f3f1ec;border:1px solid var(--line);padding:10px 12px;border-radius:var(--radius-doc);margin-bottom:18px;}
+
+  @media (max-width: 760px){
+    .shell{flex-direction:column;}
+    .sidebar{width:100%;flex-direction:row;overflow-x:auto;padding:14px 0;}
+    .brand{display:none;}
+    .nav-item{border-left:none;border-bottom:3px solid transparent;white-space:nowrap;}
+    .nav-item.active{border-left:none;border-bottom-color:var(--amber);}
+    .sidebar-foot{display:none;}
+    .main{padding:20px 16px;}
+    .cal-cell{min-height:70px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <div class="sidebar">
+    <div class="brand">
+      <h1>予定・引き継ぎ<br>管理</h1>
+      <p>弘文社 業務共有ツール</p>
+    </div>
+    <div class="nav-item active" data-view="calendar"><span class="nav-icon">◆</span>予定表</div>
+    <div class="nav-item" data-view="handover"><span class="nav-icon">◆</span>引き継ぎ</div>
+    <div class="nav-item" data-view="members"><span class="nav-icon">◆</span>メンバー</div>
+    <div class="sidebar-foot">
+      <div class="who-label">操作者（自分）</div>
+      <select id="currentUser"></select>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <div class="setup-note" id="setupNote">
+      Firebase未接続です。下部の <code>firebaseConfig</code> にプロジェクトの設定値を入力してください（詳細は同梱のREADMEを参照）。接続前はブラウザ内だけの一時保存になります。
+    </div>
+
+    <!-- 予定表 -->
+    <div class="view active" id="view-calendar">
+      <div class="view-head">
+        <div>
+          <h2>予定表</h2>
+          <div class="view-sub">部署の予定を月単位で確認・登録します</div>
+        </div>
+        <button class="btn" id="btnNewSchedule">＋ 予定を追加</button>
+      </div>
+
+      <div class="cal-toolbar">
+        <button class="btn secondary small" id="prevMonth">← 前月</button>
+        <div class="month-label" id="monthLabel"></div>
+        <button class="btn secondary small" id="nextMonth">次月 →</button>
+        <div class="filter-row">
+          担当者で絞り込み
+          <select class="filter-select" id="personFilter"><option value="">全員</option></select>
+        </div>
+      </div>
+
+      <div class="cal-grid" id="calGrid"></div>
+    </div>
+
+    <!-- 引き継ぎ -->
+    <div class="view" id="view-handover">
+      <div class="view-head">
+        <div>
+          <h2>引き継ぎ</h2>
+          <div class="view-sub">業務メモと、担当交代時の予定・タスクの引き渡しをまとめて管理します</div>
+        </div>
+        <button class="btn" id="btnNewHandover">＋ 引き継ぎを作成</button>
+      </div>
+
+      <div class="filter-row" style="margin-bottom:14px;">
+        表示
+        <select class="filter-select" id="handoverStatusFilter">
+          <option value="pending">未完了</option>
+          <option value="done">完了済み（履歴）</option>
+          <option value="all">すべて</option>
+        </select>
+      </div>
+
+      <div id="handoverList"></div>
+    </div>
+
+    <!-- メンバー -->
+    <div class="view" id="view-members">
+      <div class="view-head">
+        <div>
+          <h2>メンバー</h2>
+          <div class="view-sub">担当者候補として登録しておくと、予定・引き継ぎで選択できます</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="field" style="margin-bottom:10px;">
+          <label>メンバーを追加</label>
+          <div style="display:flex;gap:8px;">
+            <input type="text" id="newMemberName" placeholder="例：迫 健太">
+            <button class="btn small" id="btnAddMember">追加</button>
+          </div>
+        </div>
+        <div class="members-box" id="membersBox"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- 予定モーダル -->
+<div class="overlay" id="scheduleOverlay">
+  <div class="modal">
+    <h3>予定を追加</h3>
+    <div class="field">
+      <label>日付</label>
+      <input type="date" id="schedDate">
+    </div>
+    <div class="field">
+      <label>担当者</label>
+      <select id="schedPerson"></select>
+    </div>
+    <div class="field">
+      <label>件名</label>
+      <input type="text" id="schedTitle" placeholder="例：Volter定期点検">
+    </div>
+    <div class="field">
+      <label>メモ</label>
+      <textarea id="schedNote" placeholder="詳細や注意事項があれば"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" id="schedCancel">キャンセル</button>
+      <button class="btn" id="schedSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 引き継ぎモーダル -->
+<div class="overlay" id="handoverOverlay">
+  <div class="modal">
+    <h3>引き継ぎを作成</h3>
+    <div class="field">
+      <label>業務名</label>
+      <input type="text" id="hoTitle" placeholder="例：在庫棚卸し業務">
+    </div>
+    <div class="field" style="display:flex;gap:10px;">
+      <div style="flex:1;">
+        <label>引き継ぎ元</label>
+        <select id="hoFrom"></select>
+      </div>
+      <div style="flex:1;">
+        <label>引き継ぎ先</label>
+        <select id="hoTo"></select>
+      </div>
+    </div>
+    <div class="field">
+      <label>メモ・注意事項</label>
+      <textarea id="hoNote" placeholder="引き継ぎ内容、注意点、進捗状況など"></textarea>
+    </div>
+    <div class="field">
+      <label>関連する予定（引き継ぎ元の今後の予定から選択）</label>
+      <div class="related-list" id="hoRelated"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" id="hoCancel">キャンセル</button>
+      <button class="btn" id="hoSave">作成</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Firebase (compat SDK: CDN経由、ビルド不要でGitHub Pagesにそのまま置ける) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+/* =========================================================
+   Firebase 設定
+   Firebaseコンソール（https://console.firebase.google.com）で
+   プロジェクトを作成し、ウェブアプリを追加すると発行される値を
+   ここに貼り付けてください。詳しい手順は README.md を参照。
+   ========================================================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyBpEXYswXw2of3buglDfuh3pjv6SnxoU90",
+  authDomain: "koubunsha-yotei-e31a7.firebaseapp.com",
+  projectId: "koubunsha-yotei-e31a7",
+  storageBucket: "koubunsha-yotei-e31a7.firebasestorage.app",
+  messagingSenderId: "746617489265",
+  appId: "1:746617489265:web:a897ceec7a24bc785918d0"
+};
+
+let db = null;
+let firebaseReady = false;
+try {
+  if (firebaseConfig.apiKey !== "YOUR_API_KEY") {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    firebaseReady = true;
+    document.getElementById('setupNote').style.display = 'none';
+  }
+} catch (e) {
+  console.error("Firebase init failed", e);
+}
+
+/* =========================================================
+   ローカル フォールバック ストレージ
+   （Firebase未設定時は localStorage で代用。設定後は自動的に
+   Firestoreへ切り替わる）
+   ========================================================= */
+const LOCAL_KEY = 'kh_app_data_v1';
+function loadLocal(){
+  try { return JSON.parse(localStorage.getItem(LOCAL_KEY)) || {members:[], schedules:[], handovers:[]}; }
+  catch(e){ return {members:[], schedules:[], handovers:[]}; }
+}
+function saveLocal(data){ localStorage.setItem(LOCAL_KEY, JSON.stringify(data)); }
+
+let state = {
+  members: [],
+  schedules: [],
+  handovers: [],
+  currentUser: '',
+};
+
+/* ---------- data layer: unify Firestore / localStorage ---------- */
+function uid(){ return 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2,8); }
+
+async function fetchAll(){
+  if (firebaseReady){
+    const [mSnap, sSnap, hSnap] = await Promise.all([
+      db.collection('members').orderBy('name').get(),
+      db.collection('schedules').orderBy('date').get(),
+      db.collection('handovers').orderBy('createdAt', 'desc').get(),
+    ]);
+    state.members = mSnap.docs.map(d => ({id:d.id, ...d.data()}));
+    state.schedules = sSnap.docs.map(d => ({id:d.id, ...d.data()}));
+    state.handovers = hSnap.docs.map(d => ({id:d.id, ...d.data()}));
+  } else {
+    const local = loadLocal();
+    state.members = local.members;
+    state.schedules = local.schedules;
+    state.handovers = local.handovers;
+  }
+}
+
+async function addMember(name){
+  if (firebaseReady){
+    await db.collection('members').add({name});
+  } else {
+    const local = loadLocal();
+    local.members.push({id: uid(), name});
+    saveLocal(local);
+  }
+}
+async function removeMember(id){
+  if (firebaseReady){
+    await db.collection('members').doc(id).delete();
+  } else {
+    const local = loadLocal();
+    local.members = local.members.filter(m => m.id !== id);
+    saveLocal(local);
+  }
+}
+async function addSchedule(entry){
+  entry.createdAt = Date.now();
+  if (firebaseReady){
+    await db.collection('schedules').add(entry);
+  } else {
+    const local = loadLocal();
+    local.schedules.push({id: uid(), ...entry});
+    saveLocal(local);
+  }
+}
+async function removeSchedule(id){
+  if (firebaseReady){
+    await db.collection('schedules').doc(id).delete();
+  } else {
+    const local = loadLocal();
+    local.schedules = local.schedules.filter(s => s.id !== id);
+    saveLocal(local);
+  }
+}
+async function addHandover(entry){
+  entry.createdAt = Date.now();
+  entry.status = 'pending';
+  if (firebaseReady){
+    await db.collection('handovers').add(entry);
+  } else {
+    const local = loadLocal();
+    local.handovers.unshift({id: uid(), ...entry});
+    saveLocal(local);
+  }
+}
+async function setHandoverStatus(id, status){
+  if (firebaseReady){
+    await db.collection('handovers').doc(id).update({status});
+  } else {
+    const local = loadLocal();
+    const h = local.handovers.find(x => x.id === id);
+    if (h) h.status = status;
+    saveLocal(local);
+  }
+}
+async function removeHandover(id){
+  if (firebaseReady){
+    await db.collection('handovers').doc(id).delete();
+  } else {
+    const local = loadLocal();
+    local.handovers = local.handovers.filter(h => h.id !== id);
+    saveLocal(local);
+  }
+}
+
+/* ---------- UI: navigation ---------- */
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    item.classList.add('active');
+    document.getElementById('view-' + item.dataset.view).classList.add('active');
+  });
+});
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+/* ---------- members ---------- */
+function renderMemberSelects(){
+  const names = state.members.map(m => m.name);
+  const fills = [
+    document.getElementById('currentUser'),
+    document.getElementById('schedPerson'),
+    document.getElementById('hoFrom'),
+    document.getElementById('hoTo'),
+  ];
+  fills.forEach(sel => {
+    const prev = sel.value;
+    sel.innerHTML = names.map(n => `<option value="${n}">${n}</option>`).join('');
+    if (names.includes(prev)) sel.value = prev;
+  });
+
+  const personFilter = document.getElementById('personFilter');
+  const prevF = personFilter.value;
+  personFilter.innerHTML = '<option value="">全員</option>' + names.map(n => `<option value="${n}">${n}</option>`).join('');
+  personFilter.value = prevF;
+
+  if (!state.currentUser && names.length) state.currentUser = names[0];
+  document.getElementById('currentUser').value = state.currentUser;
+}
+
+function renderMembersView(){
+  const box = document.getElementById('membersBox');
+  if (!state.members.length){
+    box.innerHTML = '<div class="empty-state" style="flex:1;">まだメンバーが登録されていません</div>';
+    return;
+  }
+  box.innerHTML = state.members.map(m => `
+    <div class="member-chip">${m.name}<button data-id="${m.id}" class="rm-member">×</button></div>
+  `).join('');
+  box.querySelectorAll('.rm-member').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      await removeMember(btn.dataset.id);
+      await refresh();
+      showToast('メンバーを削除しました');
+    });
+  });
+}
+
+document.getElementById('btnAddMember').addEventListener('click', async () => {
+  const input = document.getElementById('newMemberName');
+  const name = input.value.trim();
+  if (!name) return;
+  await addMember(name);
+  input.value = '';
+  await refresh();
+  showToast('メンバーを追加しました');
+});
+
+document.getElementById('currentUser').addEventListener('change', (e) => {
+  state.currentUser = e.target.value;
+});
+
+/* ---------- calendar ---------- */
+let calYear, calMonth; // calMonth: 0-11
+(function initCalDate(){
+  const now = new Date();
+  calYear = now.getFullYear();
+  calMonth = now.getMonth();
+})();
+
+function ymd(d){
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function renderCalendar(){
+  document.getElementById('monthLabel').textContent = `${calYear}年 ${calMonth+1}月`;
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = '';
+  ['日','月','火','水','木','金','土'].forEach(d => {
+    const el = document.createElement('div');
+    el.className = 'cal-dow';
+    el.textContent = d;
+    grid.appendChild(el);
+  });
+
+  const firstDay = new Date(calYear, calMonth, 1);
+  const startOffset = firstDay.getDay();
+  const gridStart = new Date(calYear, calMonth, 1 - startOffset);
+  const todayStr = ymd(new Date());
+  const personFilter = document.getElementById('personFilter').value;
+
+  for (let i = 0; i < 42; i++){
+    const cellDate = new Date(gridStart);
+    cellDate.setDate(gridStart.getDate() + i);
+    const dateStr = ymd(cellDate);
+    const inMonth = cellDate.getMonth() === calMonth;
+
+    const cell = document.createElement('div');
+    cell.className = 'cal-cell' + (inMonth ? '' : ' other-month') + (dateStr === todayStr ? ' today' : '');
+    cell.dataset.date = dateStr;
+
+    const num = document.createElement('div');
+    num.className = 'cal-daynum';
+    num.textContent = cellDate.getDate();
+    cell.appendChild(num);
+
+    let dayEntries = state.schedules.filter(s => s.date === dateStr);
+    if (personFilter) dayEntries = dayEntries.filter(s => s.person === personFilter);
+
+    dayEntries.slice(0,3).forEach(entry => {
+      const e = document.createElement('div');
+      e.className = 'cal-entry' + (entry.person === state.currentUser ? ' mine' : '');
+      e.textContent = `${entry.person}：${entry.title}`;
+      e.title = entry.note || '';
+      cell.appendChild(e);
+    });
+    if (dayEntries.length > 3){
+      const more = document.createElement('div');
+      more.className = 'cal-more';
+      more.textContent = `他 ${dayEntries.length - 3} 件`;
+      cell.appendChild(more);
+    }
+
+    cell.addEventListener('click', () => openScheduleModal(dateStr));
+    grid.appendChild(cell);
+  }
+}
+
+document.getElementById('prevMonth').addEventListener('click', () => {
+  calMonth--; if (calMonth < 0){ calMonth = 11; calYear--; }
+  renderCalendar();
+});
+document.getElementById('nextMonth').addEventListener('click', () => {
+  calMonth++; if (calMonth > 11){ calMonth = 0; calYear++; }
+  renderCalendar();
+});
+document.getElementById('personFilter').addEventListener('change', renderCalendar);
+
+function openScheduleModal(dateStr){
+  document.getElementById('schedDate').value = dateStr || ymd(new Date());
+  document.getElementById('schedTitle').value = '';
+  document.getElementById('schedNote').value = '';
+  document.getElementById('schedPerson').value = state.currentUser;
+  document.getElementById('scheduleOverlay').classList.add('active');
+}
+document.getElementById('btnNewSchedule').addEventListener('click', () => openScheduleModal());
+document.getElementById('schedCancel').addEventListener('click', () => {
+  document.getElementById('scheduleOverlay').classList.remove('active');
+});
+document.getElementById('schedSave').addEventListener('click', async () => {
+  const date = document.getElementById('schedDate').value;
+  const person = document.getElementById('schedPerson').value;
+  const title = document.getElementById('schedTitle').value.trim();
+  const note = document.getElementById('schedNote').value.trim();
+  if (!date || !person || !title){ showToast('日付・担当者・件名は必須です'); return; }
+  await addSchedule({date, person, title, note});
+  document.getElementById('scheduleOverlay').classList.remove('active');
+  await refresh();
+  showToast('予定を追加しました');
+});
+
+/* ---------- handover ---------- */
+function renderHandoverList(){
+  const filter = document.getElementById('handoverStatusFilter').value;
+  let list = state.handovers.slice();
+  if (filter !== 'all') list = list.filter(h => h.status === filter);
+  const wrap = document.getElementById('handoverList');
+
+  if (!list.length){
+    wrap.innerHTML = '<div class="empty-state">該当する引き継ぎはありません</div>';
+    return;
+  }
+
+  wrap.innerHTML = list.map(h => {
+    const related = (h.relatedSchedules || []);
+    return `
+    <div class="card">
+      <div class="card-top">
+        <div>
+          <div class="card-title">${h.title}</div>
+          <div class="card-meta">${h.fromPerson} <span class="arrow">→</span> ${h.toPerson}</div>
+        </div>
+        <span class="tag ${h.status === 'done' ? 'status-done' : 'status-pending'}">${h.status === 'done' ? '完了' : '未完了'}</span>
+      </div>
+      ${h.note ? `<div class="card-note">${escapeHtml(h.note)}</div>` : ''}
+      ${related.length ? `<div class="card-meta" style="margin-top:10px;">引き継ぐ予定：${related.map(r => `${r.date} ${r.title}`).join(' ／ ')}</div>` : ''}
+      <div class="card-actions">
+        ${h.status !== 'done' ? `<button class="btn small" data-act="done" data-id="${h.id}">完了にする</button>` : `<button class="btn small secondary" data-act="reopen" data-id="${h.id}">未完了に戻す</button>`}
+        <button class="btn small danger" data-act="del" data-id="${h.id}">削除</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  wrap.querySelectorAll('[data-act="done"]').forEach(b => b.addEventListener('click', async () => {
+    await setHandoverStatus(b.dataset.id, 'done'); await refresh(); showToast('完了にしました');
+  }));
+  wrap.querySelectorAll('[data-act="reopen"]').forEach(b => b.addEventListener('click', async () => {
+    await setHandoverStatus(b.dataset.id, 'pending'); await refresh(); showToast('未完了に戻しました');
+  }));
+  wrap.querySelectorAll('[data-act="del"]').forEach(b => b.addEventListener('click', async () => {
+    if (!confirm('この引き継ぎを削除しますか？')) return;
+    await removeHandover(b.dataset.id); await refresh(); showToast('削除しました');
+  }));
+}
+document.getElementById('handoverStatusFilter').addEventListener('change', renderHandoverList);
+
+function escapeHtml(str){
+  return str.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function renderRelatedCandidates(){
+  const fromPerson = document.getElementById('hoFrom').value;
+  const todayStr = ymd(new Date());
+  const candidates = state.schedules
+    .filter(s => s.person === fromPerson && s.date >= todayStr)
+    .sort((a,b) => a.date.localeCompare(b.date));
+  const wrap = document.getElementById('hoRelated');
+  if (!candidates.length){
+    wrap.innerHTML = '<div class="related-item"><span>該当する今後の予定がありません</span></div>';
+    return;
+  }
+  wrap.innerHTML = candidates.map(c => `
+    <label class="related-item">
+      <input type="checkbox" value="${c.id}" data-date="${c.date}" data-title="${escapeHtml(c.title)}">
+      ${c.date}　${escapeHtml(c.title)}
+    </label>
+  `).join('');
+}
+
+function openHandoverModal(){
+  document.getElementById('hoTitle').value = '';
+  document.getElementById('hoNote').value = '';
+  document.getElementById('hoFrom').value = state.currentUser;
+  renderRelatedCandidates();
+  document.getElementById('handoverOverlay').classList.add('active');
+}
+document.getElementById('btnNewHandover').addEventListener('click', openHandoverModal);
+document.getElementById('hoFrom').addEventListener('change', renderRelatedCandidates);
+document.getElementById('hoCancel').addEventListener('click', () => {
+  document.getElementById('handoverOverlay').classList.remove('active');
+});
+document.getElementById('hoSave').addEventListener('click', async () => {
+  const title = document.getElementById('hoTitle').value.trim();
+  const fromPerson = document.getElementById('hoFrom').value;
+  const toPerson = document.getElementById('hoTo').value;
+  const note = document.getElementById('hoNote').value.trim();
+  if (!title || !fromPerson || !toPerson){ showToast('業務名・引き継ぎ元・引き継ぎ先は必須です'); return; }
+  const relatedSchedules = Array.from(document.querySelectorAll('#hoRelated input:checked')).map(cb => ({
+    date: cb.dataset.date, title: cb.dataset.title
+  }));
+  await addHandover({title, fromPerson, toPerson, note, relatedSchedules});
+  document.getElementById('handoverOverlay').classList.remove('active');
+  await refresh();
+  showToast('引き継ぎを作成しました');
+});
+
+/* ---------- refresh / init ---------- */
+async function refresh(){
+  await fetchAll();
+  renderMemberSelects();
+  renderMembersView();
+  renderCalendar();
+  renderHandoverList();
+}
+
+refresh();
+</script>
+</body>
+</html>
