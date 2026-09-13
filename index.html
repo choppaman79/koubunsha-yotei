@@ -179,6 +179,7 @@
   .kanbu-check{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;color:var(--ink-soft);margin-right:16px;}
   .kanbu-check.ok{color:#3f7a5a;font-weight:600;}
   .kanbu-weekend{color:#b0aca0;font-size:13px;padding:10px 0;}
+  .kanbu-note{font-size:11.5px;color:var(--ink-soft);margin-bottom:10px;line-height:1.5;}
 
   /* ---- daily list ---- */
   .daily-row{
@@ -606,7 +607,7 @@ if (firebaseReady){
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('appShell').style.display = '';
   document.getElementById('loginAsRow').style.display = 'none';
-  boot();
+  setTimeout(boot, 0);
 }
 
 /* =========================================================
@@ -799,6 +800,90 @@ async function confirmKanbuSeko(date, person){
   }
 }
 
+/* ---- 幹部施光の自動ローテーション ----
+   順列どおりに割り当て、休み・出張で不在の人は今日は飛ばして
+   キューの先頭に残す（次の出番でまた最初に候補になる）。 */
+function nextWeekday(dateStr){
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + 1);
+  while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+  return ymd(d);
+}
+
+function isAbsentOn(person, dateStr){
+  return state.schedules.some(s =>
+    s.date === dateStr && s.person === person && /休み|出張/.test(s.title || '')
+  );
+}
+
+function pickAvailable(queue, dateStr){
+  for (let i = 0; i < queue.length; i++){
+    if (!isAbsentOn(queue[i], dateStr)){
+      const name = queue[i];
+      queue.splice(i, 1);
+      queue.push(name);
+      return name;
+    }
+  }
+  return '';
+}
+
+async function ensureRotationInit(){
+  if (state.kanbuRotation) return;
+  if (firebaseReady){
+    const doc = await db.collection('kanbuRotation').doc('state').get();
+    if (doc.exists){ state.kanbuRotation = doc.data(); return; }
+  } else {
+    const local = loadLocal();
+    if (local.kanbuRotation){ state.kanbuRotation = local.kanbuRotation; return; }
+  }
+  const names = state.members.map(m => m.name);
+  state.kanbuRotation = {
+    roleQueue: KANBU_ROLE_CANDIDATES.map(s => matchMemberName(s, names)).filter(Boolean),
+    otherQueue: KANBU_OTHER_CANDIDATES.map(s => matchMemberName(s, names)).filter(Boolean),
+    lastGeneratedDate: null,
+  };
+}
+
+async function saveRotationState(rot){
+  state.kanbuRotation = rot;
+  if (firebaseReady){
+    await db.collection('kanbuRotation').doc('state').set(rot);
+  } else {
+    const local = loadLocal();
+    local.kanbuRotation = rot;
+    saveLocal(local);
+  }
+}
+
+async function ensureKanbuGenerated(targetDate){
+  const dow = new Date(targetDate + 'T00:00:00').getDay();
+  if (dow === 0 || dow === 6) return;
+  if (state.kanbuSeko[targetDate]) return;
+
+  await ensureRotationInit();
+  const rot = state.kanbuRotation;
+  let cursor = rot.lastGeneratedDate ? nextWeekday(rot.lastGeneratedDate) : targetDate;
+  let guard = 0;
+  while (guard < 400){
+    guard++;
+    if (!state.kanbuSeko[cursor]){
+      const roleName = pickAvailable(rot.roleQueue, cursor);
+      const o1 = pickAvailable(rot.otherQueue, cursor);
+      const o2 = pickAvailable(rot.otherQueue, cursor);
+      await saveKanbuSeko(cursor, {
+        date: cursor, roleName, roleTime: '',
+        other: [{name: o1, time: ''}, {name: o2, time: ''}],
+        auto: true,
+      });
+    }
+    rot.lastGeneratedDate = cursor;
+    if (cursor === targetDate) break;
+    cursor = nextWeekday(cursor);
+  }
+  await saveRotationState(rot);
+}
+
 /* ---------- UI: navigation ---------- */
 document.querySelectorAll('.nav-item').forEach(item => {
   item.addEventListener('click', () => {
@@ -821,21 +906,25 @@ function showToast(msg){
 /* ---------- members ---------- */
 function renderMemberSelects(){
   const names = orderMemberNames(state.members.map(m => m.name));
-  const fills = [
-    document.getElementById('currentUser'),
-    document.getElementById('schedPerson'),
-    document.getElementById('hoFrom'),
-    document.getElementById('hoTo'),
-  ];
-  fills.forEach(sel => {
+
+  // 予定表まわり（役職名なし・姓のみ表示。値は元の登録名のまま）
+  const schedPersonSel = document.getElementById('schedPerson');
+  {
+    const prev = schedPersonSel.value;
+    schedPersonSel.innerHTML = names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(surnameOf(n))}</option>`).join('');
+    if (names.includes(prev)) schedPersonSel.value = prev;
+  }
+
+  // それ以外（登録名そのまま表示）
+  [document.getElementById('currentUser'), document.getElementById('hoFrom'), document.getElementById('hoTo')].forEach(sel => {
     const prev = sel.value;
-    sel.innerHTML = names.map(n => `<option value="${n}">${n}</option>`).join('');
+    sel.innerHTML = names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
     if (names.includes(prev)) sel.value = prev;
   });
 
   const personFilter = document.getElementById('personFilter');
   const prevF = personFilter.value;
-  personFilter.innerHTML = '<option value="">全員</option>' + names.map(n => `<option value="${n}">${n}</option>`).join('');
+  personFilter.innerHTML = '<option value="">全員</option>' + names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(surnameOf(n))}</option>`).join('');
   personFilter.value = prevF;
 
   if (!state.currentUser && names.length){
@@ -906,7 +995,13 @@ function orderMemberNames(names){
   return ordered;
 }
 
-function renderDailyView(){
+/* 予定表では役職名を出さず、姓のみで表示する（データ上の値は元の登録名のまま） */
+function surnameOf(fullName){
+  const hit = MEMBER_ORDER.find(s => (fullName || '').replace(/\s+/g, '').includes(s));
+  return hit || fullName;
+}
+
+async function renderDailyView(){
   const dateInput = document.getElementById('dailyDate');
   if (!dateInput.value) dateInput.value = ymd(new Date());
   const dateStr = dateInput.value;
@@ -926,12 +1021,12 @@ function renderDailyView(){
     }).join('');
   }
 
-  renderKanbuSeko(dateStr);
+  await renderKanbuSeko(dateStr);
 }
 
 document.getElementById('dailyDate').addEventListener('change', renderDailyView);
 
-function renderKanbuSeko(dateStr){
+async function renderKanbuSeko(dateStr){
   const body = document.getElementById('kanbuBody');
   const d = new Date(dateStr + 'T00:00:00');
   const dow = d.getDay(); // 0=日,6=土
@@ -939,6 +1034,9 @@ function renderKanbuSeko(dateStr){
     body.innerHTML = '<div class="kanbu-weekend">土日は幹部施光の対象外です</div>';
     return;
   }
+
+  body.innerHTML = '<div class="kanbu-weekend">割り当てを確認中…</div>';
+  await ensureKanbuGenerated(dateStr);
 
   const names = state.members.map(m => m.name);
   const roleOptions = KANBU_ROLE_CANDIDATES.map(s => matchMemberName(s, names)).filter(Boolean);
@@ -953,6 +1051,7 @@ function renderKanbuSeko(dateStr){
     `<option value="${escapeHtml(n)}" ${n === selected ? 'selected' : ''}>${escapeHtml(n)}</option>`).join('');
 
   body.innerHTML = `
+    <div class="kanbu-note">${rec.auto === false ? '手動で設定されています。' : '順列に沿って自動で割り当てています（休み・出張の人は自動で飛ばされ、次の機会に繰り越されます）。'}必要であれば変更できます。</div>
     <div class="kanbu-row">
       <div class="kanbu-label">役職者</div>
       <select id="kanbuRoleSelect">${optHtml(roleOptions, rec.roleName)}</select>
@@ -989,7 +1088,8 @@ function renderKanbuSeko(dateStr){
     await saveKanbuSeko(dateStr, {
       date: dateStr,
       roleName, roleTime,
-      other: [{name: o0name, time: o0time}, {name: o1name, time: o1time}]
+      other: [{name: o0name, time: o0time}, {name: o1name, time: o1time}],
+      auto: false,
     });
     showToast('幹部施光を保存しました');
     renderKanbuSeko(dateStr);
@@ -1046,7 +1146,7 @@ function renderCalendar(){
     dayEntries.slice(0,3).forEach(entry => {
       const e = document.createElement('div');
       e.className = 'cal-entry' + (entry.person === state.currentUser ? ' mine' : '');
-      e.textContent = `${entry.person}：${entry.title}`;
+      e.textContent = `${surnameOf(entry.person)}：${entry.title}`;
       e.title = entry.note || '';
       e.addEventListener('click', (ev) => {
         ev.stopPropagation();
@@ -1328,7 +1428,7 @@ async function refresh(){
   renderMemberSelects();
   renderMembersView();
   renderCalendar();
-  renderDailyView();
+  await renderDailyView();
   renderHandoverList();
 }
 
