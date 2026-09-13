@@ -108,20 +108,26 @@
   }
   .cal-dow{background:var(--paper-raised);padding:8px 0;text-align:center;font-size:12px;color:var(--ink-soft);font-weight:600;}
   .cal-cell{
-    background:var(--paper-raised);min-height:104px;padding:6px 7px;
-    display:flex;flex-direction:column;gap:4px;cursor:pointer;
+    background:var(--paper-raised);min-height:104px;padding:5px 5px;
+    display:flex;flex-direction:column;gap:2px;cursor:pointer;
   }
   .cal-cell:hover{background:#f3f1ec;}
   .cal-cell.other-month{background:#f6f5f2;color:#b8b4a9;}
   .cal-cell.today{box-shadow:inset 0 0 0 2px var(--amber);}
-  .cal-daynum{font-size:12px;font-weight:600;color:var(--ink-soft);}
+  .cal-daynum{font-size:11px;font-weight:600;color:var(--ink-soft);}
   .cal-entry{
     background:var(--sage-soft);color:var(--sage);border-left:3px solid var(--sage);
-    font-size:11px;padding:2px 5px;border-radius:1px;
+    font-size:9px;padding:1px 4px;border-radius:1px;line-height:1.35;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   }
   .cal-entry.mine{background:var(--amber-soft);color:#8a5a26;border-left-color:var(--amber);}
+  .cal-entry.event{background:#e6dcf0;color:#5b3a86;border-left-color:#8a5cc4;font-weight:600;}
   .cal-more{font-size:10px;color:var(--ink-soft);}
+  .cal-duty{
+    font-size:8.5px;color:var(--navy);border-left:3px solid var(--navy);
+    background:#e9edec;padding:1px 4px;border-radius:1px;line-height:1.35;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
 
   /* ---- login screen ---- */
   .login-screen{
@@ -180,6 +186,8 @@
   .kanbu-check.ok{color:#3f7a5a;font-weight:600;}
   .kanbu-weekend{color:#b0aca0;font-size:13px;padding:10px 0;}
   .kanbu-note{font-size:11.5px;color:var(--ink-soft);margin-bottom:10px;line-height:1.5;}
+  .quick-absence-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;}
+  .kanbu-import-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px solid var(--line);}
 
   /* ---- daily list ---- */
   .daily-row{
@@ -273,10 +281,11 @@
     .view-head h2{font-size:16px;}
     .cal-toolbar,.filter-row{flex-wrap:wrap;}
     .cal-dow{font-size:9px;padding:5px 0;}
-    .cal-cell{min-height:56px;padding:3px 2px;font-size:11px;}
-    .cal-daynum{font-size:10px;}
-    .cal-entry{font-size:9px;padding:2px 3px;line-height:1.3;}
-    .cal-more{font-size:9px;}
+    .cal-cell{min-height:50px;padding:3px 2px;font-size:11px;}
+    .cal-daynum{font-size:9px;}
+    .cal-entry{font-size:7.5px;padding:1px 3px;line-height:1.3;}
+    .cal-more{font-size:8px;}
+    .cal-duty{font-size:7px;padding:1px 3px;}
     .daily-row{flex-direction:column;gap:4px;padding:10px 12px;}
     .daily-name{width:auto;font-size:13px;}
     .modal{width:94%;padding:18px;}
@@ -296,7 +305,7 @@
     <p class="login-sub">弘文社 業務共有ツール</p>
     <div class="field">
       <label>メールアドレス</label>
-      <input type="email" id="loginEmail" placeholder="例：senba@koubunsha.com">
+      <input type="email" id="loginEmail" placeholder="例*****@koubunsha.com">
     </div>
     <div class="field">
       <label>パスワード</label>
@@ -339,7 +348,8 @@
       <h1>予定・引き継ぎ<br>管理</h1>
       <p>弘文社 業務共有ツール</p>
     </div>
-    <div class="nav-item active" data-view="calendar"><span class="nav-icon">◆</span>予定表</div>
+    <div class="nav-item active" data-view="today"><span class="nav-icon">◆</span>今日</div>
+    <div class="nav-item" data-view="calendar"><span class="nav-icon">◆</span>予定表</div>
     <div class="nav-item" data-view="daily"><span class="nav-icon">◆</span>日別一覧</div>
     <div class="nav-item" data-view="handover"><span class="nav-icon">◆</span>引き継ぎ・連絡事項</div>
     <div class="nav-item" data-view="members"><span class="nav-icon">◆</span>メンバー</div>
@@ -352,8 +362,38 @@
       Firebase未接続です。下部の <code>firebaseConfig</code> にプロジェクトの設定値を入力してください（詳細は同梱のREADMEを参照）。接続前はブラウザ内だけの一時保存になります。
     </div>
 
+    <!-- 今日のまとめ -->
+    <div class="view active" id="view-today">
+      <div class="view-head">
+        <div>
+          <h2>今日のまとめ</h2>
+          <div class="view-sub" id="todayDateLabel"></div>
+        </div>
+      </div>
+
+      <div class="kanbu-block">
+        <h3>自分の今日の予定</h3>
+        <div class="quick-absence-row">
+          <input type="date" id="qaDate" class="filter-select">
+          <button class="btn small secondary" id="qaRest">休みにする</button>
+          <button class="btn small secondary" id="qaTrip">出張にする</button>
+        </div>
+        <div id="todayMineBody"></div>
+      </div>
+
+      <div class="kanbu-block">
+        <h3>今日の当番</h3>
+        <div id="todayDutyBody"></div>
+      </div>
+
+      <div class="kanbu-block">
+        <h3>未確認の連絡・引き継ぎ</h3>
+        <div id="todayUnconfirmedBody"></div>
+      </div>
+    </div>
+
     <!-- 予定表 -->
-    <div class="view active" id="view-calendar">
+    <div class="view" id="view-calendar">
       <div class="view-head">
         <div>
           <h2>予定表</h2>
@@ -388,6 +428,11 @@
         <input type="date" id="dailyDate" class="filter-select" style="max-width:180px;">
       </div>
       <div id="dailyList"></div>
+
+      <div class="kanbu-block" id="dutyBlock">
+        <h3>日直・宿直・電話</h3>
+        <div id="dutyBody"></div>
+      </div>
 
       <div class="kanbu-block" id="kanbuBlock">
         <h3>幹部施光（月〜金）</h3>
@@ -468,12 +513,16 @@
       <label>日付</label>
       <input type="date" id="schedDate">
     </div>
-    <div class="field">
+    <div class="field" id="schedIsEventRow" style="display:flex;align-items:center;gap:8px;">
+      <input type="checkbox" id="schedIsEvent" style="width:auto;">
+      <label for="schedIsEvent" style="margin:0;">行事にする（全員対象で表示されます）</label>
+    </div>
+    <div class="field" id="schedPersonRow">
       <label>担当者</label>
       <select id="schedPerson"></select>
     </div>
     <div class="field">
-      <label>件名</label>
+      <label id="schedTitleLabel">件名</label>
       <input type="text" id="schedTitle" placeholder="例：取引先訪問">
     </div>
     <div class="field">
@@ -535,6 +584,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 /* =========================================================
    Firebase 設定
@@ -617,8 +667,8 @@ if (firebaseReady){
    ========================================================= */
 const LOCAL_KEY = 'kh_app_data_v1';
 function loadLocal(){
-  try { return JSON.parse(localStorage.getItem(LOCAL_KEY)) || {members:[], schedules:[], handovers:[], kanbuSeko:{}}; }
-  catch(e){ return {members:[], schedules:[], handovers:[], kanbuSeko:{}}; }
+  try { return JSON.parse(localStorage.getItem(LOCAL_KEY)) || {members:[], schedules:[], handovers:[], kanbuSeko:{}, dailyDuty:{}}; }
+  catch(e){ return {members:[], schedules:[], handovers:[], kanbuSeko:{}, dailyDuty:{}}; }
 }
 function saveLocal(data){ localStorage.setItem(LOCAL_KEY, JSON.stringify(data)); }
 
@@ -627,6 +677,7 @@ let state = {
   schedules: [],
   handovers: [],
   kanbuSeko: {},
+  dailyDuty: {},
   currentUser: '',
 };
 
@@ -635,23 +686,27 @@ function uid(){ return 'id_' + Date.now() + '_' + Math.random().toString(36).sli
 
 async function fetchAll(){
   if (firebaseReady){
-    const [mSnap, sSnap, hSnap, kSnap] = await Promise.all([
+    const [mSnap, sSnap, hSnap, kSnap, dSnap] = await Promise.all([
       db.collection('members').orderBy('name').get(),
       db.collection('schedules').orderBy('date').get(),
       db.collection('handovers').orderBy('createdAt', 'desc').get(),
       db.collection('kanbuSeko').get(),
+      db.collection('dailyDuty').get(),
     ]);
     state.members = mSnap.docs.map(d => ({id:d.id, ...d.data()}));
     state.schedules = sSnap.docs.map(d => ({id:d.id, ...d.data()}));
     state.handovers = hSnap.docs.map(d => ({id:d.id, ...d.data()}));
     state.kanbuSeko = {};
     kSnap.docs.forEach(d => { state.kanbuSeko[d.id] = d.data(); });
+    state.dailyDuty = {};
+    dSnap.docs.forEach(d => { state.dailyDuty[d.id] = d.data(); });
   } else {
     const local = loadLocal();
     state.members = local.members;
     state.schedules = local.schedules;
     state.handovers = local.handovers;
     state.kanbuSeko = local.kanbuSeko || {};
+    state.dailyDuty = local.dailyDuty || {};
   }
 }
 
@@ -782,6 +837,19 @@ async function saveKanbuSeko(date, data){
   }
 }
 
+async function saveDailyDuty(date, data){
+  const merged = { date, ...data };
+  state.dailyDuty[date] = merged;
+  if (firebaseReady){
+    await db.collection('dailyDuty').doc(date).set(merged, { merge: true });
+  } else {
+    const local = loadLocal();
+    local.dailyDuty = local.dailyDuty || {};
+    local.dailyDuty[date] = merged;
+    saveLocal(local);
+  }
+}
+
 async function confirmKanbuSeko(date, person){
   const existing = state.kanbuSeko[date] || {};
   const confirmedBy = existing.confirmedBy || [];
@@ -893,6 +961,7 @@ document.querySelectorAll('.nav-item').forEach(item => {
     document.getElementById('view-' + item.dataset.view).classList.add('active');
     if (item.dataset.view === 'handover') renderHandoverList();
     if (item.dataset.view === 'daily') renderDailyView();
+    if (item.dataset.view === 'today') renderTodayView();
   });
 });
 
@@ -967,6 +1036,7 @@ document.getElementById('btnAddMember').addEventListener('click', async () => {
 document.getElementById('currentUser').addEventListener('change', (e) => {
   state.currentUser = e.target.value;
   localStorage.setItem('kh_current_user', e.target.value);
+  renderTodayView();
 });
 
 /* ---------- calendar ---------- */
@@ -1013,18 +1083,204 @@ async function renderDailyView(){
     wrap.innerHTML = '<div class="empty-state">まだメンバーが登録されていません</div>';
   } else {
     wrap.innerHTML = orderedNames.map(name => {
-      const entries = state.schedules.filter(s => s.date === dateStr && s.person === name);
+      const entries = state.schedules.filter(s => s.date === dateStr && (s.person === name || s.isEvent));
       const body = entries.length
-        ? entries.map(e => `<div class="daily-entry">${escapeHtml(e.title)}${e.note ? `<span class="t">（${escapeHtml(e.note)}）</span>` : ''}</div>`).join('')
+        ? entries.map(e => `<div class="daily-entry">${e.isEvent ? '<span class="notice-tag">行事</span> ' : ''}${escapeHtml(e.title)}${e.note ? `<span class="t">（${escapeHtml(e.note)}）</span>` : ''}</div>`).join('')
         : '<div class="daily-none">予定なし</div>';
       return `<div class="daily-row"><div class="daily-name">${escapeHtml(name)}</div><div class="daily-entries">${body}</div></div>`;
     }).join('');
   }
 
+  renderDailyDuty(dateStr);
   await renderKanbuSeko(dateStr);
 }
 
 document.getElementById('dailyDate').addEventListener('change', renderDailyView);
+
+/* ---------- 今日のまとめ ---------- */
+function renderTodayView(){
+  const todayStr = ymd(new Date());
+  document.getElementById('todayDateLabel').textContent = todayStr;
+
+  const qaDate = document.getElementById('qaDate');
+  if (!qaDate.value) qaDate.value = todayStr;
+
+  const mine = state.schedules.filter(s => s.date === todayStr && (s.person === state.currentUser || s.isEvent));
+  document.getElementById('todayMineBody').innerHTML = mine.length
+    ? mine.map(e => `<div class="daily-entry">${e.isEvent ? '<span class="notice-tag">行事</span> ' : ''}${escapeHtml(e.title)}${e.note ? `<span class="t">（${escapeHtml(e.note)}）</span>` : ''}</div>`).join('')
+    : '<div class="daily-none">今日の予定はありません</div>';
+
+  const dow = new Date(todayStr + 'T00:00:00').getDay();
+  const duty = state.dailyDuty[todayStr] || {};
+  const kanbu = state.kanbuSeko[todayStr] || {};
+  const lines = [];
+  if (dow !== 0 && dow !== 6){
+    const otherNames = (kanbu.other || []).map(o => o && o.name).filter(Boolean);
+    if (kanbu.roleName || otherNames.length){
+      lines.push(`幹部施光：${kanbu.roleName || '未定'}／${otherNames.join('・') || '未定'}`);
+    }
+  }
+  if (duty.nitchoku) lines.push(`日直：${duty.nitchoku}`);
+  if (duty.shukuchoku) lines.push(`宿直：${duty.shukuchoku}`);
+  if (duty.touchoku) lines.push(`当直：${duty.touchoku}`);
+  if (duty.denwa) lines.push(`電話：${duty.denwa}`);
+  document.getElementById('todayDutyBody').innerHTML = lines.length
+    ? lines.map(l => `<div class="daily-entry">${escapeHtml(l)}</div>`).join('')
+    : '<div class="daily-none">当番はまだ設定されていません</div>';
+
+  const items = state.handovers.filter(h => {
+    const viewedBy = h.viewedBy || [];
+    if (viewedBy.includes(state.currentUser)) return false;
+    if (h.type === 'notice') return true;
+    return h.toPerson === state.currentUser && h.status !== 'done';
+  });
+  document.getElementById('todayUnconfirmedBody').innerHTML = items.length
+    ? items.map(h => `<div class="daily-entry">${h.type === 'notice' ? '<span class="notice-tag">連絡事項</span>' : '<span class="handover-tag">引き継ぎ</span>'} ${escapeHtml(h.title)}</div>`).join('')
+    : '<div class="daily-none">未確認の項目はありません</div>';
+}
+
+async function quickAbsence(title){
+  const date = document.getElementById('qaDate').value || ymd(new Date());
+  if (!state.currentUser){ showToast('操作者が未設定です'); return; }
+  await addSchedule({ date, person: state.currentUser, title, note: '' });
+  showToast(`${title}を登録しました`);
+  await refresh();
+}
+document.getElementById('qaRest').addEventListener('click', () => quickAbsence('休み'));
+document.getElementById('qaTrip').addEventListener('click', () => quickAbsence('出張'));
+
+function renderDailyDuty(dateStr){
+  const body = document.getElementById('dutyBody');
+  const names = orderMemberNames(state.members.map(m => m.name));
+  const rec = state.dailyDuty[dateStr] || {};
+
+  const optHtml = (selected) => '<option value="">未選択</option>' + names.map(n =>
+    `<option value="${escapeHtml(n)}" ${n === selected ? 'selected' : ''}>${escapeHtml(n)}</option>`).join('');
+
+  body.innerHTML = `
+    <div class="kanbu-row">
+      <div class="kanbu-label">日直</div>
+      <select id="dutyNitchoku">${optHtml(rec.nitchoku)}</select>
+    </div>
+    <div class="kanbu-row">
+      <div class="kanbu-label">宿直</div>
+      <select id="dutyShukuchoku">${optHtml(rec.shukuchoku)}</select>
+    </div>
+    <div class="kanbu-row">
+      <div class="kanbu-label">当直</div>
+      <select id="dutyTouchoku">${optHtml(rec.touchoku)}</select>
+    </div>
+    <div class="kanbu-row">
+      <div class="kanbu-label">電話</div>
+      <select id="dutyDenwa">${optHtml(rec.denwa)}</select>
+    </div>
+    <div class="kanbu-row">
+      <button class="btn small" id="dutySaveBtn">保存</button>
+    </div>
+    <div class="kanbu-import-row">
+      <label class="btn small secondary" for="dutyImportFile" style="cursor:pointer;">Excelから一括インポート</label>
+      <input type="file" id="dutyImportFile" accept=".xlsx,.xls,.csv" style="display:none;">
+      <span class="kanbu-note" style="margin:0;">列見出し：日付・日直・宿直・当直・電話（この順）</span>
+    </div>
+  `;
+
+  document.getElementById('dutySaveBtn').addEventListener('click', async () => {
+    await saveDailyDuty(dateStr, {
+      nitchoku: document.getElementById('dutyNitchoku').value,
+      shukuchoku: document.getElementById('dutyShukuchoku').value,
+      touchoku: document.getElementById('dutyTouchoku').value,
+      denwa: document.getElementById('dutyDenwa').value,
+    });
+    renderCalendar();
+    showToast('日直・宿直・当直・電話を保存しました');
+  });
+
+  document.getElementById('dutyImportFile').addEventListener('change', handleDutyImportFile);
+}
+
+/* ---- 日直・宿直・当直・電話のExcel一括インポート ----
+   列見出し（1行目）：日付・日直・宿直・当直・電話（表記ゆれ吸収は簡易対応） */
+function excelSerialToYmd(serial){
+  // Excelのシリアル値(1900年基準)をYYYY-MM-DDへ変換
+  const utcDays = Math.floor(serial - 25569);
+  const d = new Date(utcDays * 86400 * 1000);
+  return ymd(d);
+}
+function normalizeImportDate(val){
+  if (val == null || val === '') return null;
+  if (typeof val === 'number') return excelSerialToYmd(val);
+  const s = String(val).trim();
+  let m = s.match(/^(\d{4})[\/\-年](\d{1,2})[\/\-月](\d{1,2})/);
+  if (m) return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+  m = s.match(/^(\d{1,2})[\/\-](\d{1,2})$/);
+  if (m){
+    const y = new Date().getFullYear();
+    return `${y}-${String(m[1]).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}`;
+  }
+  return null;
+}
+function resolveMemberName(raw, names){
+  if (!raw) return '';
+  const clean = String(raw).trim();
+  if (!clean) return '';
+  const exact = names.find(n => n === clean);
+  if (exact) return exact;
+  const partial = names.find(n => n.replace(/\s+/g,'').includes(clean) || clean.includes(n.replace(/\s+/g,'')));
+  return partial || clean;
+}
+
+async function handleDutyImportFile(ev){
+  const file = ev.target.files && ev.target.files[0];
+  if (!file) return;
+  if (typeof XLSX === 'undefined'){
+    showToast('インポート機能の読み込みに失敗しました。通信環境を確認してください。');
+    return;
+  }
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array', cellDates: false });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: '' });
+    if (!rows.length){ showToast('データが見つかりませんでした'); return; }
+
+    const names = state.members.map(m => m.name);
+    let header = rows[0].map(h => String(h || '').trim());
+    let startIdx = 1;
+    // 1行目が見出し行でなければ、見出しなしとみなして先頭から読む
+    if (!header.some(h => /日付|日直|宿直|当直|電話/.test(h))){
+      header = ['日付','日直','宿直','当直','電話'];
+      startIdx = 0;
+    }
+    const col = name => header.findIndex(h => h.includes(name));
+    const idxDate = col('日付') >= 0 ? col('日付') : 0;
+    const idxNit = col('日直') >= 0 ? col('日直') : 1;
+    const idxShu = col('宿直') >= 0 ? col('宿直') : 2;
+    const idxTou = col('当直') >= 0 ? col('当直') : 3;
+    const idxDen = col('電話') >= 0 ? col('電話') : 4;
+
+    let count = 0;
+    for (let i = startIdx; i < rows.length; i++){
+      const row = rows[i];
+      if (!row || !row.length) continue;
+      const dateStr = normalizeImportDate(row[idxDate]);
+      if (!dateStr) continue;
+      await saveDailyDuty(dateStr, {
+        nitchoku: resolveMemberName(row[idxNit], names),
+        shukuchoku: resolveMemberName(row[idxShu], names),
+        touchoku: resolveMemberName(row[idxTou], names),
+        denwa: resolveMemberName(row[idxDen], names),
+      });
+      count++;
+    }
+    renderCalendar();
+    showToast(`${count}件の日直・宿直・当直・電話をインポートしました`);
+  } catch (e){
+    console.error(e);
+    showToast('インポートに失敗しました。ファイル形式をご確認ください。');
+  } finally {
+    ev.target.value = '';
+  }
+}
 
 async function renderKanbuSeko(dateStr){
   const body = document.getElementById('kanbuBody');
@@ -1141,12 +1397,14 @@ function renderCalendar(){
     cell.appendChild(num);
 
     let dayEntries = state.schedules.filter(s => s.date === dateStr);
-    if (personFilter) dayEntries = dayEntries.filter(s => s.person === personFilter);
+    if (personFilter) dayEntries = dayEntries.filter(s => s.person === personFilter || s.isEvent);
 
-    dayEntries.slice(0,3).forEach(entry => {
+    dayEntries.forEach(entry => {
       const e = document.createElement('div');
-      e.className = 'cal-entry' + (entry.person === state.currentUser ? ' mine' : '');
-      e.textContent = `${surnameOf(entry.person)}：${entry.title}`;
+      e.className = entry.isEvent
+        ? 'cal-entry event'
+        : 'cal-entry' + (entry.person === state.currentUser ? ' mine' : '');
+      e.textContent = entry.isEvent ? `行事：${entry.title}` : `${surnameOf(entry.person)}：${entry.title}`;
       e.title = entry.note || '';
       e.addEventListener('click', (ev) => {
         ev.stopPropagation();
@@ -1154,11 +1412,21 @@ function renderCalendar(){
       });
       cell.appendChild(e);
     });
-    if (dayEntries.length > 3){
-      const more = document.createElement('div');
-      more.className = 'cal-more';
-      more.textContent = `他 ${dayEntries.length - 3} 件`;
-      cell.appendChild(more);
+
+    const duty = state.dailyDuty[dateStr];
+    if (duty && (duty.nitchoku || duty.shukuchoku || duty.touchoku || duty.denwa)){
+      const dutyLines = [
+        duty.nitchoku ? `日直：${surnameOf(duty.nitchoku)}` : null,
+        duty.shukuchoku ? `宿直：${surnameOf(duty.shukuchoku)}` : null,
+        duty.touchoku ? `当直：${surnameOf(duty.touchoku)}` : null,
+        duty.denwa ? `電話：${surnameOf(duty.denwa)}` : null,
+      ].filter(Boolean);
+      dutyLines.forEach(line => {
+        const dline = document.createElement('div');
+        dline.className = 'cal-duty';
+        dline.textContent = line;
+        cell.appendChild(dline);
+      });
     }
 
     cell.addEventListener('click', () => openScheduleModal(dateStr));
@@ -1185,23 +1453,32 @@ function openScheduleModal(dateStr, entry){
   document.getElementById('schedTitle').value = entry ? entry.title : '';
   document.getElementById('schedNote').value = entry ? (entry.note || '') : '';
   document.getElementById('schedPerson').value = entry ? entry.person : state.currentUser;
+  document.getElementById('schedIsEvent').checked = entry ? !!entry.isEvent : false;
+  updateSchedEventUI();
   document.getElementById('scheduleOverlay').classList.add('active');
 }
+function updateSchedEventUI(){
+  const isEvent = document.getElementById('schedIsEvent').checked;
+  document.getElementById('schedPersonRow').style.display = isEvent ? 'none' : '';
+  document.getElementById('schedTitleLabel').textContent = isEvent ? '行事名' : '件名';
+}
+document.getElementById('schedIsEvent').addEventListener('change', updateSchedEventUI);
 document.getElementById('btnNewSchedule').addEventListener('click', () => openScheduleModal());
 document.getElementById('schedCancel').addEventListener('click', () => {
   document.getElementById('scheduleOverlay').classList.remove('active');
 });
 document.getElementById('schedSave').addEventListener('click', async () => {
   const date = document.getElementById('schedDate').value;
-  const person = document.getElementById('schedPerson').value;
+  const isEvent = document.getElementById('schedIsEvent').checked;
+  const person = isEvent ? 'ALL_EVENT' : document.getElementById('schedPerson').value;
   const title = document.getElementById('schedTitle').value.trim();
   const note = document.getElementById('schedNote').value.trim();
-  if (!date || !person || !title){ showToast('日付・担当者・件名は必須です'); return; }
+  if (!date || !title || (!isEvent && !person)){ showToast('日付・担当者・件名は必須です'); return; }
   if (editingScheduleId){
-    await updateSchedule(editingScheduleId, {date, person, title, note});
+    await updateSchedule(editingScheduleId, {date, person, title, note, isEvent});
     showToast('予定を更新しました');
   } else {
-    await addSchedule({date, person, title, note});
+    await addSchedule({date, person, title, note, isEvent});
     showToast('予定を追加しました');
   }
   document.getElementById('scheduleOverlay').classList.remove('active');
@@ -1430,6 +1707,7 @@ async function refresh(){
   renderCalendar();
   await renderDailyView();
   renderHandoverList();
+  renderTodayView();
 }
 
 /* ① ログイン後に操作者を選択させる */
@@ -1452,6 +1730,7 @@ document.getElementById('operatorSelectConfirm').addEventListener('click', () =>
   document.getElementById('currentUser').value = val;
   document.getElementById('operatorOverlay').classList.remove('active');
   renderHandoverList();
+  renderTodayView();
   checkReminders();
 });
 
@@ -1488,3 +1767,4 @@ async function boot(){
 </script>
 </body>
 </html>
+
